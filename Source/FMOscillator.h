@@ -3,7 +3,6 @@
 
     FMOscillator.h
     Created:    25 Nov 2025 11:00:00am
-    Modified:   2 Jan 2026 12:17:00pm
 
   ==============================================================================
 */
@@ -17,19 +16,17 @@ struct FMOscillatorSound final : public SynthesiserSound
     bool appliesToChannel (int /*midiChannel*/) override    { return true; }
 };
 
-// Classic FM operator with two sine wave oscillators in series
-// Modulator osc output -> Carrier osc input
+// Classic FM phase modulation operator with two sine wave oscillators in series
+// Modulator osc output -> Carrier osc phase
 struct FMOscillatorVoice final : public SynthesiserVoice
 {
     void startNote (int midiNoteNumber, float velocity,
                     SynthesiserSound*, int /*currentPitchWheelPosition*/) override
     {
-        carrierPhaseIndex = 0.0;
-        modulatorPhaseIndex = 0.0;
-        auto carrierFreq = MidiMessage::getMidiNoteInHertz (midiNoteNumber);
-        auto cyclesPerSample = carrierFreq / getSampleRate();
-        carrierPhaseIncrement = cyclesPerSample * MathConstants<double>::twoPi;
-        modPhaseIncrement = carrierPhaseIncrement * modRatio;
+        double carrierFreq = MidiMessage::getMidiNoteInHertz (midiNoteNumber);
+        double cyclesPerSample = carrierFreq / getSampleRate();
+        carrierPhaseIncrement = cyclesPerSample * juce::MathConstants<double>::twoPi;
+        modulatorPhaseIncrement = carrierPhaseIncrement * modulatorRatio;
     }
 
     void renderNextBlock (AudioBuffer<float>& outputBuffer, int startSample, int numSamples) override
@@ -38,14 +35,15 @@ struct FMOscillatorVoice final : public SynthesiserVoice
         {
             while (--numSamples >= 0)
             {
-                // Increment mod phase
-                modulatorPhaseIndex += modPhaseIncrement;
-                auto modWaveValue = std::sin(modulatorPhaseIndex);
+                // Increment mod phase and calculate mod wave
+                modulatorPhaseIndex.advance(modulatorPhaseIncrement);
+                double modulatorWaveValue = std::sin(modulatorPhaseIndex.phase);
 
-                // Apply modulator to carrier
-                carrierPhaseIndex += carrierPhaseIncrement + (modWaveValue * modIndex);
-                auto carrierWaveValue = std::sin(carrierPhaseIndex);
-                auto levelAdjustedSample = carrierWaveValue * level;
+                // Increment carrier phase and apply modulator to carrier
+                carrierPhaseIndex.advance(carrierPhaseIncrement);
+                double modulatedPhase = carrierPhaseIndex.phase + (modulatorWaveValue * modulatorIndex);
+                double carrierWaveValue = std::sin(modulatedPhase);
+                float levelAdjustedSample = static_cast<float>(carrierWaveValue * level);
 
                 // Write sample to output buffers
                 auto outputLen = outputBuffer.getNumChannels();
@@ -58,15 +56,19 @@ struct FMOscillatorVoice final : public SynthesiserVoice
         }
     }
 
-    bool canPlaySound (SynthesiserSound* sound) override { return dynamic_cast<FMOscillatorSound*> (sound) != nullptr; }
-    void stopNote (float /*velocity*/, bool /*allowTailOff*/) override { carrierPhaseIncrement = 0.0; }
+    bool canPlaySound (SynthesiserSound* sound) override { 
+        return dynamic_cast<FMOscillatorSound*> (sound) != nullptr; 
+    }
+    void stopNote (float /*velocity*/, bool /*allowTailOff*/) override { 
+        carrierPhaseIncrement = 0.0;
+    }
     void pitchWheelMoved (int /*newValue*/) override                              {}
     void controllerMoved (int /*controllerNumber*/, int /*newValue*/) override    {}
 
     using SynthesiserVoice::renderNextBlock;
 
-    double modulatorPhaseIndex = 0.0, modPhaseIncrement = 0.0;
-    double carrierPhaseIndex = 0.0, carrierPhaseIncrement = 0.0;
-    double modIndex = 0.0, modRatio = 0.0;
+    double carrierPhaseIncrement = 0.0, modulatorPhaseIncrement = 0.0;
+    juce::dsp::Phase<double> carrierPhaseIndex { 0.0 }, modulatorPhaseIndex { 0.0 };
+    double modulatorRatio = 1.0, modulatorIndex = 0.0;
     double level = 1.0;
 };

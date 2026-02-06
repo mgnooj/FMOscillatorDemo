@@ -33,10 +33,7 @@ struct SynthAudioSource final : public AudioSource
 {
     SynthAudioSource (MidiKeyboardState& keyState)  : keyboardState (keyState)
     {
-        for (auto i = 0; i < 4; ++i)
-        {
-            synth.addVoice (new FMOscillatorVoice());
-        }
+        synth.addVoice (new FMOscillatorVoice());
         synth.clearSounds();
         synth.addSound (new FMOscillatorSound());
     }
@@ -112,24 +109,20 @@ public:
         modIndexControl.setValue(0.0, dontSendNotification);
         modIndexControl.onValueChange = [this]() {
             auto& synth = synthAudioSource.synth;
-            for (auto i = 0; i < synth.getNumVoices(); i++) {
-                FMOscillatorVoice* voice = static_cast<FMOscillatorVoice*>(synth.getVoice(i));
-                voice->modIndex = modIndexControl.getValue();
-            }
+            FMOscillatorVoice* voice = static_cast<FMOscillatorVoice*>(synth.getVoice(0));
+            voice->modulatorIndex = modIndexControl.getValue();
         };
         addAndMakeVisible(modIndexLabel);
         modIndexLabel.setText("Mod Index", juce::dontSendNotification);
         modIndexLabel.attachToComponent(&modIndexControl, true);
 
         addAndMakeVisible(modRatioControl);
-        modRatioControl.setRange (0.0, 20.0, 0.1);
-        modRatioControl.setValue(0.0, dontSendNotification);
+        modRatioControl.setRange (1.0, 20.0, 0.1);
+        modRatioControl.setValue(1.0, dontSendNotification);
         modRatioControl.onValueChange = [this]() {
             auto& synth = synthAudioSource.synth;
-            for (auto i = 0; i < synth.getNumVoices(); i++) {
-                FMOscillatorVoice* voice = static_cast<FMOscillatorVoice*>(synth.getVoice(i));
-                voice->modRatio = modRatioControl.getValue();
-            }
+            FMOscillatorVoice* voice = static_cast<FMOscillatorVoice*>(synth.getVoice(0));
+            voice->modulatorRatio = modRatioControl.getValue();
         };
         addAndMakeVisible(modRatioLabel);
         modRatioLabel.setText("Mod Ratio", juce::dontSendNotification);
